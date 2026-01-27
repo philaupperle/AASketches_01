@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bouncing Dots with Trails</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #1a1a1a;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        main {
+            text-align: center;
+        }
+        h1 {
+            color: #fff;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>Bouncing Dots</h1>
+        <div id="canvas-container"></div>
+    </main>
+
+    <script>
+        class Dot {
+            constructor() {
+                this.radius = random(10, 30);
+                this.x = random(this.radius, 500 - this.radius);
+                this.y = random(this.radius, 500 - this.radius);
+                this.vx = random(-3, 3);
+                this.vy = random(-3, 3);
+                // Ensure dots actually move
+                if (abs(this.vx) < 1) this.vx = this.vx < 0 ? -2 : 2;
+                if (abs(this.vy) < 1) this.vy = this.vy < 0 ? -2 : 2;
+                this.color = this.getYellowToRedColor();
+                this.trails = [];
+                this.lastColorChange = 0;
+                this.colliding = false;
+                this.collisionEndTime = 0;
+            }
+
+            update() {
+                // Move the dot
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Bounce off walls
+                if (this.x - this.radius < 0 || this.x + this.radius > 500) {
+                    this.vx *= -1;
+                    this.x = constrain(this.x, this.radius, 500 - this.radius);
+                    this.changeColor();
+                    this.startCollision();
+                }
+                if (this.y - this.radius < 0 || this.y + this.radius > 500) {
+                    this.vy *= -1;
+                    this.y = constrain(this.y, this.radius, 500 - this.radius);
+                    this.changeColor();
+                    this.startCollision();
+                }
+
+                // Add trail if currently in collision state
+                if (this.colliding || millis() < this.collisionEndTime) {
+                    this.addTrail();
+                }
+
+                // Update trails - keep for 10 seconds
+                this.trails = this.trails.filter(trail => millis() - trail.time < 10000);
+            }
+
+            startCollision() {
+                this.colliding = true;
+                this.collisionEndTime = millis() + 500; // Leave trail for 500ms after collision
+            }
+
+            endCollision() {
+                this.colliding = false;
+            }
+
+            getYellowToRedColor() {
+                return getGradientColor();
+            }
+
+            changeColor() {
+                // Only change color if enough time has passed (300ms cooldown)
+                if (millis() - this.lastColorChange > 300) {
+                    this.color = this.getYellowToRedColor();
+                    this.lastColorChange = millis();
+                }
+            }
+
+            addTrail() {
+                this.trails.push({
+                    x: this.x,
+                    y: this.y,
+                    time: millis(),
+                    color: color(red(this.color), green(this.color), blue(this.color))
+                });
+            }
+
+            display() {
+                // Draw trails
+                for (let i = 0; i < this.trails.length; i++) {
+                    let trail = this.trails[i];
+                    fill(trail.color);
+                    noStroke();
+                    circle(trail.x, trail.y, this.radius * 2);
+                }
+
+                // Draw dot
+                fill(this.color);
+                noStroke();
+                circle(this.x, this.y, this.radius * 2);
+            }
+
+            checkCollision(other) {
+                let dx = other.x - this.x;
+                let dy = other.y - this.y;
+                let distance = sqrt(dx * dx + dy * dy);
+                return distance < this.radius + other.radius;
+            }
+
+            bounce(other) {
+                // Simple elastic collision
+                let dx = other.x - this.x;
+                let dy = other.y - this.y;
+                let distance = sqrt(dx * dx + dy * dy);
+
+                // Normalize collision vector
+                let nx = dx / distance;
+                let ny = dy / distance;
+
+                // Relative velocity
+                let dvx = this.vx - other.vx;
+                let dvy = this.vy - other.vy;
+
+                // Relative velocity in collision normal direction
+                let dotProduct = dvx * nx + dvy * ny;
+
+                // Do not resolve if velocities are separating
+                if (dotProduct > 0) return;
+
+                // Exchange velocity components along collision normal
+                this.vx -= dotProduct * nx;
+                this.vy -= dotProduct * ny;
+                other.vx += dotProduct * nx;
+                other.vy += dotProduct * ny;
+
+                // Separate dots to prevent overlap
+                let overlap = (this.radius + other.radius - distance) / 2;
+                this.x -= overlap * nx;
+                this.y -= overlap * ny;
+                other.x += overlap * nx;
+                other.y += overlap * ny;
+            }
+        }
+
+        let dots = [];
+        const NUM_DOTS = 8;
+        let currentGradient = 0;
+        
+        // Define multiple gradients
+        const gradients = [
+            { name: 'Yellow to Red', start: [255, 255, 0], end: [255, 0, 0] },
+            { name: 'Cyan to Blue', start: [0, 255, 255], end: [0, 0, 255] },
+            { name: 'Green to Yellow', start: [0, 255, 0], end: [255, 255, 0] },
+            { name: 'Purple to Pink', start: [128, 0, 128], end: [255, 105, 180] },
+            { name: 'Orange to Red', start: [255, 165, 0], end: [255, 0, 0] },
+            { name: 'Blue to Purple', start: [0, 100, 255], end: [150, 0, 255] }
+        ];
+
+        function getGradientColor() {
+            let grad = gradients[currentGradient];
+            let t = random(1);
+            let r = lerp(grad.start[0], grad.end[0], t);
+            let g = lerp(grad.start[1], grad.end[1], t);
+            let b = lerp(grad.start[2], grad.end[2], t);
+            return color(r, g, b);
+        }
+
+        function resetSketch() {
+            dots = [];
+            for (let i = 0; i < NUM_DOTS; i++) {
+                dots.push(new Dot());
+            }
+            currentGradient = (currentGradient + 1) % gradients.length;
+            console.log('Switched to gradient:', gradients[currentGradient].name);
+        }
+
+        function setup() {
+            let canvas = createCanvas(500, 500);
+            canvas.parent('canvas-container');
+            resetSketch();
+        }
+
+        function draw() {
+            background(240);
+            
+            // Draw canvas border
+            noFill();
+            stroke(0);
+            strokeWeight(2);
+            rect(0, 0, 500, 500);
+
+            // Check collisions
+            for (let i = 0; i < dots.length; i++) {
+                for (let j = i + 1; j < dots.length; j++) {
+                    if (dots[i].checkCollision(dots[j])) {
+                        dots[i].bounce(dots[j]);
+                        dots[i].changeColor();
+                        dots[j].changeColor();
+                        dots[i].startCollision();
+                        dots[j].startCollision();
+                    }
+                }
+            }
+
+            // Update and display all dots
+            for (let dot of dots) {
+                dot.update();
+                dot.display();
+            }
+        }
+
+        function mousePressed() {
+            // Check if click is within canvas
+            if (mouseX >= 0 && mouseX <= 500 && mouseY >= 0 && mouseY <= 500) {
+                resetSketch();
+            }
+        }
+    </script>
+</body>
+</html>
