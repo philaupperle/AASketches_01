@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Projects</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FFF8E7;
+    --card: #ffffff;
+    --accent: #5BCEFA;
+    --purple: #C77DFF;
+    --sun: #FFD93D;
+    --mint: #6BCB77;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: var(--bg);
+    min-height: 100vh;
+    padding: 48px 24px;
+    background-image: radial-gradient(circle at 15% 15%, #FFE5B4 0%, transparent 50%),
+                      radial-gradient(circle at 85% 85%, #C8F7DC 0%, transparent 50%);
+  }
+
+  h1 {
+    font-family: 'Fredoka One', cursive;
+    font-size: 2.8rem;
+    text-align: center;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .subtitle {
+    text-align: center;
+    color: #999;
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 48px;
+  }
+
+  #file-list {
+    max-width: 640px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .file-card {
+    background: var(--card);
+    border-radius: 20px;
+    padding: 20px 28px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.07);
+    text-decoration: none;
+    color: #333;
+    transition: transform 0.15s cubic-bezier(.34,1.56,.64,1), box-shadow 0.15s;
+    border-left: 6px solid var(--accent);
+  }
+
+  .file-card:nth-child(2n)   { border-left-color: var(--purple); }
+  .file-card:nth-child(3n)   { border-left-color: var(--mint); }
+  .file-card:nth-child(4n)   { border-left-color: var(--sun); }
+
+  .file-card:hover {
+    transform: translateY(-3px) scale(1.01);
+    box-shadow: 0 10px 32px rgba(0,0,0,0.12);
+  }
+
+  .file-icon {
+    font-size: 2rem;
+    flex-shrink: 0;
+  }
+
+  .file-name {
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.3rem;
+  }
+
+  .file-ext {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #aaa;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  .arrow {
+    margin-left: auto;
+    font-size: 1.4rem;
+    color: #ccc;
+  }
+
+  .status {
+    text-align: center;
+    color: #aaa;
+    font-weight: 700;
+    padding: 40px;
+  }
+
+  .error {
+    color: #FF6B6B;
+  }
+</style>
+</head>
+<body>
+
+<h1>🗂 My Projects</h1>
+<p class="subtitle">philaupperle / AASketches_01</p>
+
+<div id="file-list">
+  <p class="status">Loading files...</p>
+</div>
+
+<script>
+  const GITHUB_USER = 'philaupperle';
+  const GITHUB_REPO = 'AASketches_01';
+  const BRANCH = 'main'; // change to 'master' if needed
+
+  const SKIP = ['index.html', 'README.md', '.gitignore'];
+
+  const ICONS = {
+    html: '🌐',
+    js:   '⚙️',
+    css:  '🎨',
+    md:   '📝',
+    json: '🗄️',
+    png:  '🖼️',
+    jpg:  '🖼️',
+    pdf:  '📄',
+    default: '📁'
+  };
+
+  function getIcon(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    return ICONS[ext] || ICONS.default;
+  }
+
+  function getDisplayName(filename) {
+    return filename.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
+  }
+
+  async function loadFiles() {
+    const container = document.getElementById('file-list');
+    const apiUrl = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/?ref=${BRANCH}`;
+
+    try {
+      const res = await fetch(apiUrl);
+      if (!res.ok) throw new Error('Could not reach GitHub API');
+      const files = await res.json();
+
+      const viewable = files.filter(f =>
+        f.type === 'file' &&
+        !SKIP.includes(f.name) &&
+        !f.name.startsWith('.')
+      );
+
+      if (viewable.length === 0) {
+        container.innerHTML = '<p class="status">No files found yet. Upload some files to get started!</p>';
+        return;
+      }
+
+      container.innerHTML = '';
+      viewable.forEach(file => {
+        const ext = file.name.split('.').pop().toLowerCase();
+        const isPage = ['html', 'htm'].includes(ext);
+        const href = isPage
+          ? `https://${GITHUB_USER}.github.io/${GITHUB_REPO}/${file.name}`
+          : file.html_url;
+
+        const card = document.createElement('a');
+        card.className = 'file-card';
+        card.href = href;
+        if (!isPage) card.target = '_blank';
+        card.innerHTML = `
+          <span class="file-icon">${getIcon(file.name)}</span>
+          <div>
+            <div class="file-name">${getDisplayName(file.name)}</div>
+            <div class="file-ext">${ext} file</div>
+          </div>
+          <span class="arrow">→</span>
+        `;
+        container.appendChild(card);
+      });
+
+    } catch (err) {
+      container.innerHTML = `<p class="status error">⚠️ Couldn't load files: ${err.message}</p>`;
+    }
+  }
+
+  loadFiles();
+</script>
+</body>
+</html>
