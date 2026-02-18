@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proximity Trail Dots</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <style>
+        body { margin:0; padding:20px; display:flex; flex-direction:column; justify-content:center; align-items:center; min-height:100vh; background:#1a1a1a; font-family:system-ui,-apple-system,sans-serif; box-sizing:border-box; }
+        main { text-align:center; width:100%; }
+        h1 { color:#fff; margin-bottom:16px; }
+        .controls { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px 30px; max-width:900px; margin:0 auto 20px; color:#fff; font-size:13px; }
+        .controls label { display:block; margin-bottom:4px; }
+        .controls input[type=range] { width:100%; }
+        #canvas-container { width:100%; display:flex; justify-content:center; }
+        #canvas-container canvas { transform-origin:top center; transform:scale(var(--canvas-scale,1)); display:block; }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>Proximity Trail Dots</h1>
+        <div class="controls">
+            <div><label>Proximity Distance: <span id="proximityValue">50</span>px</label><input type="range" id="proximitySlider" min="0" max="500" value="50"></div>
+            <div><label>Trail Lifetime: <span id="trailLengthValue">5</span>s</label><input type="range" id="trailLengthSlider" min="0" max="10" value="5" step="0.5"></div>
+            <div><label>Auto-Gradient: <span id="gradientIntervalValue">OFF</span></label><input type="range" id="gradientIntervalSlider" min="0" max="5" value="0" step="0.5"></div>
+            <div><label>Particles: <span id="numDotsValue">8</span></label><input type="range" id="numDotsSlider" min="1" max="30" value="8" step="1"></div>
+            <div><label>Max Size: <span id="maxSizeValue">30</span>px</label><input type="range" id="maxSizeSlider" min="5" max="100" value="30" step="1"></div>
+            <div><label>Speed: <span id="speedValue">3</span></label><input type="range" id="speedSlider" min="0.5" max="15" value="3" step="0.5"></div>
+            <div style="display:flex;align-items:center;gap:10px;padding-top:16px;"><label>Background:</label><button id="bgToggle" style="padding:6px 16px;border-radius:6px;border:none;cursor:pointer;background:#EAD7B5;color:#333;font-weight:bold;">Light</button></div>
+        </div>
+        <div id="canvas-container"></div>
+    </main>
+    <script>
+        const W = 1920, H = 1080, SCALE = H / 500;
+        let NUM_DOTS = 8, MAX_SIZE = 30, MAX_SPEED = 3;
+        let MAX_TRAIL_DISTANCE = 50 * SCALE, MAX_TRAIL_LIFETIME = 5;
+        let gradientChangeInterval = 0, lastGradientChange = 0;
+        let currentGradient = -1;  // Start at -1 so first reset goes to 0
+        let currentDotIndex = 0;
+        let bgLight = [234, 215, 181];
+        let bgDark = [25, 35, 45];
+        let bgColor = bgLight;
+
+        const gradients = [
+            { name:'Red',    start:[255,80,0],   end:[255,0,0]   },
+            { name:'Orange', start:[255,200,0],  end:[255,100,0] },
+            { name:'Yellow', start:[255,255,0],  end:[220,200,0] },
+            { name:'Green',  start:[0,255,80],   end:[0,180,0]   },
+            { name:'Cyan',   start:[0,255,255],  end:[0,150,200] },
+            { name:'Blue',   start:[0,100,255],  end:[0,0,200]   },
+            { name:'Purple', start:[150,0,255],  end:[80,0,150]  },
+            { name:'Pink',   start:[255,105,180],end:[200,0,100] },
+        ];
+
+        function colorFromGradient(gradIndex) {
+            let g = gradients[gradIndex % gradients.length];
+            let t = random(1);
+            return color(lerp(g.start[0],g.end[0],t), lerp(g.start[1],g.end[1],t), lerp(g.start[2],g.end[2],t));
+        }
+
+        class Dot {
+            constructor(gradIndex) {
+                this.radius = random(10*SCALE, MAX_SIZE*SCALE);
+                this.x = random(this.radius, W-this.radius);
+                this.y = random(this.radius, H-this.radius);
+                let speed = random(1, MAX_SPEED)*SCALE, angle = random(TWO_PI);
+                this.vx = cos(angle)*speed; this.vy = sin(angle)*speed;
+                this.gradIndex = gradIndex;
+                this.color = colorFromGradient(this.gradIndex);
+                this.trails = [];
+            }
+            advanceGradient() {
+                this.gradIndex = (this.gradIndex + 1) % gradients.length;
+                this.color = colorFromGradient(this.gradIndex);
+            }
+            update() {
+                this.x += this.vx; this.y += this.vy;
+                if (this.x-this.radius<0 || this.x+this.radius>W) { this.vx*=-1; this.x=constrain(this.x,this.radius,W-this.radius); }
+                if (this.y-this.radius<0 || this.y+this.radius>H) { this.vy*=-1; this.y=constrain(this.y,this.radius,H-this.radius); }
+                this.trails = this.trails.filter(t => millis()-t.time < t.lifetime);
+            }
+            addTrail(lifetime) {
+                this.trails.push({x:this.x,y:this.y,time:millis(),lifetime,color:color(red(this.color),green(this.color),blue(this.color))});
+            }
+            checkProximity(other) { let dx=other.x-this.x,dy=other.y-this.y; return sqrt(dx*dx+dy*dy); }
+            display() {
+                noStroke();
+                for (let t of this.trails) { fill(t.color); circle(t.x,t.y,this.radius*2); }
+                fill(this.color); circle(this.x,this.y,this.radius*2);
+            }
+        }
+
+        let dots = [];
+
+        function resetSketch() {
+            dots = [];
+            currentGradient = (currentGradient + 1) % gradients.length;
+            for (let i=0; i<NUM_DOTS; i++) dots.push(new Dot(currentGradient));
+            currentDotIndex = 0;
+            lastGradientChange = millis();
+        }
+
+        function changeGradientOnly() {
+            if (dots.length > 0) {
+                dots[currentDotIndex].advanceGradient();
+                currentDotIndex = (currentDotIndex + 1) % dots.length;
+            }
+            lastGradientChange = millis();
+        }
+
+        function setup() {
+            let canvas = createCanvas(W, H);
+            canvas.parent('canvas-container');
+            scaleCanvas(); resetSketch();
+        }
+
+        function scaleCanvas() {
+            let scale = Math.min((window.innerWidth-40)/W, 1);
+            document.getElementById('canvas-container').style.setProperty('--canvas-scale', scale);
+            document.getElementById('canvas-container').style.height = (H*scale)+'px';
+        }
+        window.addEventListener('resize', scaleCanvas);
+
+        function draw() {
+            background(bgColor[0], bgColor[1], bgColor[2]);
+            if (gradientChangeInterval>0 && millis()-lastGradientChange > gradientChangeInterval*1000) changeGradientOnly();
+            noFill(); stroke(0); strokeWeight(2); rect(0,0,W,H);
+            for (let i=0; i<dots.length; i++) {
+                for (let j=i+1; j<dots.length; j++) {
+                    let dist = dots[i].checkProximity(dots[j]);
+                    if (dist <= MAX_TRAIL_DISTANCE) {
+                        let n = dist/MAX_TRAIL_DISTANCE;
+                        let lifetime = lerp(MAX_TRAIL_LIFETIME*1000, MAX_TRAIL_LIFETIME*100, n);
+                        dots[i].addTrail(lifetime); dots[j].addTrail(lifetime);
+                    }
+                }
+            }
+            for (let dot of dots) { dot.update(); dot.display(); }
+        }
+
+        function mousePressed() {
+            if (mouseX>=0 && mouseX<=W && mouseY>=0 && mouseY<=H) resetSketch();
+        }
+
+        document.getElementById('proximitySlider').addEventListener('input',e=>{ MAX_TRAIL_DISTANCE=parseInt(e.target.value)*SCALE; document.getElementById('proximityValue').textContent=e.target.value; });
+        document.getElementById('trailLengthSlider').addEventListener('input',e=>{ MAX_TRAIL_LIFETIME=parseFloat(e.target.value); document.getElementById('trailLengthValue').textContent=e.target.value; });
+        document.getElementById('gradientIntervalSlider').addEventListener('input',e=>{ gradientChangeInterval=parseFloat(e.target.value); document.getElementById('gradientIntervalValue').textContent=gradientChangeInterval===0?'OFF':gradientChangeInterval+'s'; lastGradientChange=millis(); });
+        document.getElementById('numDotsSlider').addEventListener('input',e=>{ NUM_DOTS=parseInt(e.target.value); document.getElementById('numDotsValue').textContent=NUM_DOTS; while(dots.length<NUM_DOTS) dots.push(new Dot(dots.length%gradients.length)); while(dots.length>NUM_DOTS) dots.pop(); });
+        document.getElementById('maxSizeSlider').addEventListener('input',e=>{ MAX_SIZE=parseInt(e.target.value); document.getElementById('maxSizeValue').textContent=MAX_SIZE; });
+        document.getElementById('speedSlider').addEventListener('input',e=>{ MAX_SPEED=parseFloat(e.target.value); document.getElementById('speedValue').textContent=MAX_SPEED; for(let dot of dots){let s=sqrt(dot.vx*dot.vx+dot.vy*dot.vy),ns=random(1,MAX_SPEED)*SCALE;if(s>0){dot.vx=(dot.vx/s)*ns;dot.vy=(dot.vy/s)*ns;}} });
+        document.getElementById('bgToggle').addEventListener('click',function(){ 
+            if(bgColor===bgLight){
+                bgColor=bgDark;
+                this.textContent='Dark';
+                this.style.background='#19232D';
+                this.style.color='#fff';
+            }else{
+                bgColor=bgLight;
+                this.textContent='Light';
+                this.style.background='#EAD7B5';
+                this.style.color='#333';
+            } 
+        });
+    </script>
+</body>
+</html>
