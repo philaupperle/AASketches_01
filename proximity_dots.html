@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proximity Trail Dots</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #1a1a1a;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        main {
+            text-align: center;
+        }
+        h1 {
+            color: #fff;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <h1>Proximity Trail Dots</h1>
+        <div style="margin-bottom: 20px; color: #fff;">
+            <div style="margin-bottom: 10px;">
+                <label for="proximitySlider">Max Proximity Distance: <span id="proximityValue">50</span>px</label><br>
+                <input type="range" id="proximitySlider" min="0" max="500" value="50" style="width: 300px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="trailLengthSlider">Max Trail Lifetime: <span id="trailLengthValue">5</span>s</label><br>
+                <input type="range" id="trailLengthSlider" min="0" max="10" value="5" step="0.5" style="width: 300px;">
+            </div>
+            <div>
+                <label for="gradientIntervalSlider">Auto-Gradient Change: <span id="gradientIntervalValue">OFF</span></label><br>
+                <input type="range" id="gradientIntervalSlider" min="0" max="30" value="0" step="1" style="width: 300px;">
+            </div>
+        </div>
+        <div id="canvas-container"></div>
+    </main>
+
+    <script>
+        class Dot {
+            constructor() {
+                this.radius = random(10, 30);
+                this.x = random(this.radius, 500 - this.radius);
+                this.y = random(this.radius, 500 - this.radius);
+                this.vx = random(-3, 3);
+                this.vy = random(-3, 3);
+                // Ensure dots actually move
+                if (abs(this.vx) < 1) this.vx = this.vx < 0 ? -2 : 2;
+                if (abs(this.vy) < 1) this.vy = this.vy < 0 ? -2 : 2;
+                this.color = getGradientColor();
+                this.trails = [];
+                this.lastColorChange = 0;
+            }
+
+            update() {
+                // Move the dot
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Bounce off walls
+                if (this.x - this.radius < 0 || this.x + this.radius > 500) {
+                    this.vx *= -1;
+                    this.x = constrain(this.x, this.radius, 500 - this.radius);
+                }
+                if (this.y - this.radius < 0 || this.y + this.radius > 500) {
+                    this.vy *= -1;
+                    this.y = constrain(this.y, this.radius, 500 - this.radius);
+                }
+
+                // Update trails - each trail has its own lifetime
+                this.trails = this.trails.filter(trail => millis() - trail.time < trail.lifetime);
+            }
+
+            getYellowToRedColor() {
+                return getGradientColor();
+            }
+
+            changeColor() {
+                // Only change color if enough time has passed (300ms cooldown)
+                if (millis() - this.lastColorChange > 300) {
+                    this.color = this.getYellowToRedColor();
+                    this.lastColorChange = millis();
+                }
+            }
+
+            addTrail(lifetime) {
+                this.trails.push({
+                    x: this.x,
+                    y: this.y,
+                    time: millis(),
+                    lifetime: lifetime,
+                    color: color(red(this.color), green(this.color), blue(this.color))
+                });
+            }
+
+            checkProximity(other) {
+                let dx = other.x - this.x;
+                let dy = other.y - this.y;
+                let distance = sqrt(dx * dx + dy * dy);
+                return distance;
+            }
+
+            display() {
+                // Draw trails
+                for (let i = 0; i < this.trails.length; i++) {
+                    let trail = this.trails[i];
+                    fill(trail.color);
+                    noStroke();
+                    circle(trail.x, trail.y, this.radius * 2);
+                }
+
+                // Draw dot
+                fill(this.color);
+                noStroke();
+                circle(this.x, this.y, this.radius * 2);
+            }
+        }
+
+        let dots = [];
+        const NUM_DOTS = 8;
+        let MAX_TRAIL_DISTANCE = 50;
+        let MAX_TRAIL_LIFETIME = 5; // in seconds
+        let currentGradient = 0;
+        let gradientChangeInterval = 0; // in seconds, 0 = off
+        let lastGradientChange = 0;
+        let currentDotIndex = 0; // Track which dot to change next
+        
+        // Define multiple gradients
+        const gradients = [
+            { name: 'Yellow to Red', start: [255, 255, 0], end: [255, 0, 0] },
+            { name: 'Cyan to Blue', start: [0, 255, 255], end: [0, 0, 255] },
+            { name: 'Green to Yellow', start: [0, 255, 0], end: [255, 255, 0] },
+            { name: 'Purple to Pink', start: [128, 0, 128], end: [255, 105, 180] },
+            { name: 'Orange to Red', start: [255, 165, 0], end: [255, 0, 0] },
+            { name: 'Blue to Purple', start: [0, 100, 255], end: [150, 0, 255] }
+        ];
+
+        function getGradientColor() {
+            let grad = gradients[currentGradient];
+            let t = random(1);
+            let r = lerp(grad.start[0], grad.end[0], t);
+            let g = lerp(grad.start[1], grad.end[1], t);
+            let b = lerp(grad.start[2], grad.end[2], t);
+            return color(r, g, b);
+        }
+
+        function resetSketch() {
+            dots = [];
+            for (let i = 0; i < NUM_DOTS; i++) {
+                dots.push(new Dot());
+            }
+            currentGradient = (currentGradient + 1) % gradients.length;
+            currentDotIndex = 0; // Reset the dot index
+            lastGradientChange = millis();
+            console.log('Switched to gradient:', gradients[currentGradient].name);
+        }
+
+        function changeGradientOnly() {
+            if (dots.length > 0) {
+                // Change the current dot's color
+                dots[currentDotIndex].color = getGradientColor();
+                
+                // Move to next dot
+                currentDotIndex++;
+                
+                // If we've cycled through all dots, move to next gradient and reset index
+                if (currentDotIndex >= dots.length) {
+                    currentDotIndex = 0;
+                    currentGradient = (currentGradient + 1) % gradients.length;
+                    console.log('All dots updated. Switched to gradient:', gradients[currentGradient].name);
+                }
+            }
+            lastGradientChange = millis();
+        }
+
+        function setup() {
+            let canvas = createCanvas(500, 500);
+            canvas.parent('canvas-container');
+            resetSketch();
+        }
+
+        function draw() {
+            background(240);
+            
+            // Check if it's time for auto-gradient change
+            if (gradientChangeInterval > 0) {
+                if (millis() - lastGradientChange > gradientChangeInterval * 1000) {
+                    changeGradientOnly();
+                }
+            }
+            
+            // Draw canvas border
+            noFill();
+            stroke(0);
+            strokeWeight(2);
+            rect(0, 0, 500, 500);
+
+            // Check proximity between all dots
+            for (let i = 0; i < dots.length; i++) {
+                for (let j = i + 1; j < dots.length; j++) {
+                    let distance = dots[i].checkProximity(dots[j]);
+                    
+                    if (distance <= MAX_TRAIL_DISTANCE) {
+                        // Normalized distance: 0 (touching) to 1 (at max distance)
+                        let normalizedDist = distance / MAX_TRAIL_DISTANCE;
+                        
+                        // Closer = longer trail lifetime
+                        // At distance 0, trails last MAX_TRAIL_LIFETIME seconds
+                        // At max distance, trails last 10% of max lifetime
+                        let maxLifetimeMs = MAX_TRAIL_LIFETIME * 1000;
+                        let minLifetimeMs = maxLifetimeMs * 0.1;
+                        let trailLifetime = lerp(maxLifetimeMs, minLifetimeMs, normalizedDist);
+                        
+                        // Always add trail when within range (continuous density)
+                        dots[i].addTrail(trailLifetime);
+                        dots[j].addTrail(trailLifetime);
+                    }
+                }
+            }
+
+            // Update and display all dots
+            for (let dot of dots) {
+                dot.update();
+                dot.display();
+            }
+        }
+
+        function mousePressed() {
+            // Check if click is within canvas
+            if (mouseX >= 0 && mouseX <= 500 && mouseY >= 0 && mouseY <= 500) {
+                resetSketch();
+            }
+        }
+
+        // Control event listeners
+        document.getElementById('proximitySlider').addEventListener('input', function(e) {
+            MAX_TRAIL_DISTANCE = parseInt(e.target.value);
+            document.getElementById('proximityValue').textContent = MAX_TRAIL_DISTANCE;
+        });
+
+        document.getElementById('trailLengthSlider').addEventListener('input', function(e) {
+            MAX_TRAIL_LIFETIME = parseFloat(e.target.value);
+            document.getElementById('trailLengthValue').textContent = MAX_TRAIL_LIFETIME;
+        });
+
+        document.getElementById('gradientIntervalSlider').addEventListener('input', function(e) {
+            gradientChangeInterval = parseInt(e.target.value);
+            if (gradientChangeInterval === 0) {
+                document.getElementById('gradientIntervalValue').textContent = 'OFF';
+            } else {
+                document.getElementById('gradientIntervalValue').textContent = gradientChangeInterval + 's';
+            }
+            lastGradientChange = millis(); // Reset timer when slider changes
+        });
+    </script>
+</body>
+</html>
