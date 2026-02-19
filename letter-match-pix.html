@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Letter Match!</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sky: #5BCEFA;
+    --sun: #FFD93D;
+    --coral: #FF6B6B;
+    --mint: #6BCB77;
+    --purple: #C77DFF;
+    --bg: #FFF8E7;
+    --card: #FFFFFF;
+    --shadow: 0 8px 32px rgba(0,0,0,0.12);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: var(--bg);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
+    background-image: radial-gradient(circle at 20% 20%, #FFE5B4 0%, transparent 50%),
+                      radial-gradient(circle at 80% 80%, #C8F7DC 0%, transparent 50%);
+  }
+
+  header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    background: white;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .logo {
+    font-family: 'Fredoka One', cursive;
+    font-size: 2rem;
+    background: linear-gradient(135deg, var(--sky), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .score-board {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .score-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: #F4F4F4;
+    border-radius: 16px;
+    padding: 8px 18px;
+  }
+
+  .score-label {
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #999;
+  }
+
+  .score-num {
+    font-family: 'Fredoka One', cursive;
+    font-size: 2rem;
+    line-height: 1;
+  }
+
+  .score-num.correct { color: var(--mint); }
+  .score-num.wrong   { color: var(--coral); }
+
+  .reset-btn {
+    background: var(--sun);
+    border: none;
+    border-radius: 50px;
+    padding: 10px 20px;
+    font-family: 'Fredoka One', cursive;
+    font-size: 1.1rem;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(255,217,61,0.5);
+    transition: transform 0.15s, box-shadow 0.15s;
+    color: #5A4000;
+  }
+  .reset-btn:active { transform: scale(0.93); box-shadow: none; }
+
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 24px;
+    gap: 36px;
+    width: 100%;
+    max-width: 680px;
+  }
+
+  .prompt {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-align: center;
+  }
+
+  /* BIG CARD */
+  .big-card {
+    width: 220px;
+    height: 220px;
+    border-radius: 36px;
+    background: linear-gradient(135deg, var(--sky), var(--purple));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 16px 48px rgba(91,206,250,0.4);
+    user-select: none;
+    overflow: hidden;
+    gap: 4px;
+  }
+
+  .big-card.pop { animation: pop 0.4s cubic-bezier(.34,1.56,.64,1); }
+
+  @keyframes pop {
+    0%   { transform: scale(0.5) rotate(-10deg); opacity: 0; }
+    100% { transform: scale(1)   rotate(0deg);   opacity: 1; }
+  }
+
+  .big-card img {
+    width: 130px;
+    height: 130px;
+    object-fit: contain;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+  }
+
+  .big-card .letter-label {
+    font-family: 'Fredoka One', cursive;
+    font-size: 3.2rem;
+    color: white;
+    line-height: 1;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  }
+
+  .big-card.no-image .letter-label { font-size: 8rem; }
+
+  /* CHOICE BUTTONS */
+  .choices {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .choice-btn {
+    width: 150px;
+    height: 150px;
+    border-radius: 28px;
+    border: 5px solid transparent;
+    background: white;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    transition: transform 0.15s cubic-bezier(.34,1.56,.64,1), box-shadow 0.15s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    -webkit-tap-highlight-color: transparent;
+    outline: none;
+    position: relative;
+    overflow: hidden;
+    padding: 10px;
+  }
+
+  .choice-btn:hover { transform: scale(1.06); }
+  .choice-btn:active { transform: scale(0.94); }
+
+  .choice-btn img {
+    width: 80px;
+    height: 80px;
+    object-fit: contain;
+  }
+
+  .choice-btn .choice-letter {
+    font-family: 'Fredoka One', cursive;
+    font-size: 2rem;
+    color: #444;
+    line-height: 1;
+  }
+
+  .choice-btn.no-image .choice-letter { font-size: 4.5rem; }
+
+  .key-hint {
+    position: absolute;
+    bottom: 6px;
+    right: 9px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: #ccc;
+    pointer-events: none;
+  }
+
+  .choice-btn.correct-flash    { animation: correctFlash  0.6s ease    forwards; }
+  .choice-btn.wrong-flash      { animation: wrongFlash    0.5s ease    forwards; }
+  .choice-btn.keyboard-highlight { animation: keyHighlight 0.15s ease; }
+
+  @keyframes correctFlash {
+    0%   { background: white;   border-color: transparent; }
+    30%  { background: #6BCB77; border-color: #3da84e; transform: scale(1.15); }
+    100% { background: #6BCB77; border-color: #3da84e; transform: scale(1); }
+  }
+
+  @keyframes wrongFlash {
+    0%   { background: white;   transform: translateX(0); }
+    20%  { background: #FF6B6B; transform: translateX(-10px); }
+    40%  {                       transform: translateX(10px); }
+    60%  {                       transform: translateX(-8px); }
+    80%  {                       transform: translateX(8px); }
+    100% { background: #FF6B6B; transform: translateX(0); }
+  }
+
+  @keyframes keyHighlight {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(0.92); }
+    100% { transform: scale(1); }
+  }
+
+  /* Celebration overlay */
+  #celebrate {
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+  }
+
+  #celebrate.show { animation: celebFade 1.4s ease forwards; }
+
+  @keyframes celebFade {
+    0%   { opacity: 0; }
+    20%  { opacity: 1; }
+    80%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  .celebrate-text {
+    font-family: 'Fredoka One', cursive;
+    font-size: 5rem;
+    color: white;
+    text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    text-align: center;
+  }
+
+  #celebrate.show .celebrate-text {
+    animation: celebBounce 0.5s cubic-bezier(.34,1.56,.64,1) forwards;
+  }
+
+  @keyframes celebBounce {
+    0%   { transform: scale(0) rotate(-15deg); }
+    100% { transform: scale(1) rotate(0deg); }
+  }
+
+  .confetti-piece {
+    position: fixed;
+    pointer-events: none;
+    z-index: 99;
+    animation: confettiFall linear forwards;
+  }
+
+  @keyframes confettiFall {
+    0%   { transform: translateY(-20px) rotate(0deg);   opacity: 1; }
+    100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+  }
+
+  #wrong-flash-overlay {
+    position: fixed; inset: 0;
+    background: rgba(255,80,80,0.25);
+    pointer-events: none;
+    z-index: 50;
+    opacity: 0;
+  }
+
+  #wrong-flash-overlay.show { animation: wrongOverlay 0.5s ease forwards; }
+
+  @keyframes wrongOverlay {
+    0%   { opacity: 0; }
+    25%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  .keyboard-hint-bar {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #bbb;
+    letter-spacing: 1px;
+    text-align: center;
+  }
+
+  @media (max-width: 520px) {
+    .big-card { width: 170px; height: 170px; border-radius: 28px; }
+    .big-card img { width: 100px; height: 100px; }
+    .big-card .letter-label { font-size: 2.4rem; }
+    .choice-btn { width: 120px; height: 120px; }
+    .choice-btn img { width: 60px; height: 60px; }
+    .choice-btn .choice-letter { font-size: 1.6rem; }
+    .logo { font-size: 1.5rem; }
+    .score-num { font-size: 1.6rem; }
+    .keyboard-hint-bar { display: none; }
+    .celebrate-text { font-size: 3rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🔤 Letter Match!</div>
+  <div class="score-board">
+    <div class="score-item">
+      <span class="score-label">✅ Right</span>
+      <span class="score-num correct" id="correct-count">0</span>
+    </div>
+    <div class="score-item">
+      <span class="score-label">❌ Wrong</span>
+      <span class="score-num wrong" id="wrong-count">0</span>
+    </div>
+    <div class="score-item">
+      <span class="score-label">🔢 Total</span>
+      <span class="score-num" style="color:#888;" id="total-count">0</span>
+    </div>
+    <div class="score-item">
+      <span class="score-label">🎯 Score</span>
+      <span class="score-num" style="color:#FF9F43;" id="pct-count">—</span>
+    </div>
+    <button class="reset-btn" onclick="resetGame()">🔄 Reset</button>
+  </div>
+</header>
+
+<main>
+  <div class="prompt">Find the matching letter!</div>
+
+  <div class="big-card" id="big-card">
+    <img id="big-img" src="" alt="" style="display:none;" />
+    <div class="letter-label" id="big-letter">A</div>
+  </div>
+
+  <div class="choices" id="choices"></div>
+  <div class="keyboard-hint-bar">⌨️ Press 1, 2, 3 — or type the letter</div>
+</main>
+
+<div id="celebrate">
+  <div class="celebrate-text" id="celebrate-text">⭐ Great Job! ⭐</div>
+</div>
+<div id="wrong-flash-overlay"></div>
+
+<script>
+  // ── CONFIG ─────────────────────────────────────────────
+  const IMAGE_PATH = 'images/';
+  const IMAGE_EXT  = '.png';
+  // ───────────────────────────────────────────────────────
+
+  const LETTERS         = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  const CELEBRATIONS    = ['⭐ Great Job! ⭐','🎉 Awesome! 🎉','🌟 YES! 🌟','👏 Yay! 👏','🎊 Perfect! 🎊','🦄 Woohoo! 🦄','🍭 Correct! 🍭'];
+  const CONFETTI_COLORS = ['#FFD93D','#6BCB77','#5BCEFA','#FF6B6B','#C77DFF','#FF9F43','#FFF'];
+  const CARD_COLORS     = ['#FFD93D','#5BCEFA','#C77DFF','#FF9F43','#6BCB77','#FF6B6B'];
+
+  let correctScore  = 0;
+  let wrongScore    = 0;
+  let totalTurns    = 0;
+  let canClick      = true;
+  let currentLetter = '';
+
+  const imageCache = {};   // letter → true/false
+
+  function imgSrc(letter) { return IMAGE_PATH + letter + IMAGE_EXT; }
+
+  function checkImage(letter) {
+    if (imageCache[letter] !== undefined) return Promise.resolve(imageCache[letter]);
+    return new Promise(resolve => {
+      const img = new Image();
+      img.onload  = () => { imageCache[letter] = true;  resolve(true);  };
+      img.onerror = () => { imageCache[letter] = false; resolve(false); };
+      img.src = imgSrc(letter);
+    });
+  }
+
+  function updateStats() {
+    document.getElementById('correct-count').textContent = correctScore;
+    document.getElementById('wrong-count').textContent   = wrongScore;
+    document.getElementById('total-count').textContent   = totalTurns;
+    document.getElementById('pct-count').textContent     = totalTurns > 0
+      ? Math.round((correctScore / totalTurns) * 100) + '%' : '—';
+  }
+
+  function pickRandom(arr, exclude) {
+    const opts = arr.filter(x => x !== exclude);
+    return opts[Math.floor(Math.random() * opts.length)];
+  }
+
+  async function newRound() {
+    canClick = true;
+    currentLetter = LETTERS[Math.floor(Math.random() * LETTERS.length)];
+
+    // --- Big card ---
+    const card   = document.getElementById('big-card');
+    const bigImg = document.getElementById('big-img');
+    const bigLbl = document.getElementById('big-letter');
+
+    card.classList.remove('pop', 'no-image');
+    void card.offsetWidth;
+
+    const hasImg = await checkImage(currentLetter);
+    if (hasImg) {
+      bigImg.src = imgSrc(currentLetter);
+      bigImg.style.display = 'block';
+      bigLbl.textContent = currentLetter;
+    } else {
+      bigImg.style.display = 'none';
+      bigLbl.textContent = currentLetter;
+      card.classList.add('no-image');
+    }
+    card.classList.add('pop');
+
+    // --- Choices ---
+    let w1 = pickRandom(LETTERS, currentLetter);
+    let w2 = pickRandom(LETTERS, currentLetter);
+    while (w2 === w1) w2 = pickRandom(LETTERS, currentLetter);
+
+    const choiceLetters = [currentLetter, w1, w2].sort(() => Math.random() - 0.5);
+    const imgChecks     = await Promise.all(choiceLetters.map(l => checkImage(l)));
+
+    const container = document.getElementById('choices');
+    container.innerHTML = '';
+
+    choiceLetters.forEach((letter, i) => {
+      const btn = document.createElement('button');
+      btn.className    = 'choice-btn';
+      btn.dataset.letter = letter;
+      btn.style.borderColor = CARD_COLORS[i % CARD_COLORS.length] + '55';
+
+      if (imgChecks[i]) {
+        const img = document.createElement('img');
+        img.src = imgSrc(letter);
+        img.alt = letter;
+        btn.appendChild(img);
+        const lbl = document.createElement('div');
+        lbl.className   = 'choice-letter';
+        lbl.textContent = letter;
+        btn.appendChild(lbl);
+      } else {
+        btn.classList.add('no-image');
+        const lbl = document.createElement('div');
+        lbl.className   = 'choice-letter';
+        lbl.textContent = letter;
+        btn.appendChild(lbl);
+      }
+
+      const hint = document.createElement('span');
+      hint.className   = 'key-hint';
+      hint.textContent = i + 1;
+      btn.appendChild(hint);
+
+      btn.addEventListener('click', () => handleChoice(btn, letter));
+      container.appendChild(btn);
+    });
+  }
+
+  // Keyboard: type the letter OR press 1/2/3
+  document.addEventListener('keydown', (e) => {
+    if (!canClick) return;
+    const key     = e.key.toUpperCase();
+    const buttons = [...document.querySelectorAll('.choice-btn')];
+
+    if (['1','2','3'].includes(e.key)) {
+      const btn = buttons[parseInt(e.key) - 1];
+      if (btn) { pulse(btn); handleChoice(btn, btn.dataset.letter); }
+      return;
+    }
+    if (/^[A-Z]$/.test(key)) {
+      const btn = buttons.find(b => b.dataset.letter === key);
+      if (btn) { pulse(btn); handleChoice(btn, key); }
+    }
+  });
+
+  function pulse(btn) {
+    btn.classList.add('keyboard-highlight');
+    setTimeout(() => btn.classList.remove('keyboard-highlight'), 150);
+  }
+
+  function handleChoice(btn, letter) {
+    if (!canClick) return;
+    canClick = false;
+    totalTurns++;
+
+    if (letter === currentLetter) {
+      correctScore++;
+      updateStats();
+      btn.classList.add('correct-flash');
+      showCelebration();
+      setTimeout(newRound, 1600);
+    } else {
+      wrongScore++;
+      updateStats();
+      btn.classList.add('wrong-flash');
+      showWrongFlash();
+      setTimeout(() => {
+        canClick = true;
+        btn.classList.remove('wrong-flash');
+        btn.style.background = '';
+      }, 600);
+    }
+  }
+
+  function showCelebration() {
+    const el   = document.getElementById('celebrate');
+    const text = document.getElementById('celebrate-text');
+    text.textContent = CELEBRATIONS[Math.floor(Math.random() * CELEBRATIONS.length)];
+    const bg = CONFETTI_COLORS[Math.floor(Math.random() * 3)];
+    el.style.background = `radial-gradient(circle, ${bg}88 0%, transparent 70%)`;
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+    spawnConfetti();
+  }
+
+  function spawnConfetti() {
+    for (let i = 0; i < 60; i++) {
+      setTimeout(() => {
+        const p = document.createElement('div');
+        p.className = 'confetti-piece';
+        p.style.left = Math.random() * 100 + 'vw';
+        p.style.top  = '-20px';
+        p.style.background = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
+        p.style.borderRadius = Math.random() > 0.5 ? '50%' : '3px';
+        const sz = 10 + Math.random() * 10;
+        p.style.width  = sz + 'px';
+        p.style.height = sz + 'px';
+        p.style.animationDuration = (1.2 + Math.random() * 1.2) + 's';
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), 2500);
+      }, i * 20);
+    }
+  }
+
+  function showWrongFlash() {
+    const el = document.getElementById('wrong-flash-overlay');
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+  }
+
+  function resetGame() {
+    correctScore = 0;
+    wrongScore   = 0;
+    totalTurns   = 0;
+    updateStats();
+    newRound();
+  }
+
+  newRound();
+</script>
+</body>
+</html>
